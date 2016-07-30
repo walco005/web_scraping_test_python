@@ -4,6 +4,7 @@ for a given search query and returns the doctors information as a CSV file."""
 #https://google.github.io/styleguide/pyguide.html?showone=Comments#Comments
 import urllib2
 import time
+from collections import OrderedDict
 from selenium import webdriver
 from bs4 import BeautifulSoup
 
@@ -48,9 +49,9 @@ class Doctor(object):
             self.lic_num, ", Exp. Date:", self.exp_date, ", Status:",\
             self.status, "]"
 
-def recursive_parse(current_page):
-    """Recursively parses each page until it reaches the last page of results.
-    THIS FUNCTION ASSUMES THAT current_page % 10 = 1"""
+def recursive_parse(current_page, url_list = []):
+    """Gets all of the urls from the search result pages and returns
+    a list of all the unique urls found."""
     results_page = BeautifulSoup(BROWSER.page_source, "html.parser")
     last_link = results_page.find("table").find_all("a", href=True)[-1].text
     if current_page % 10 == 1:
@@ -58,30 +59,37 @@ def recursive_parse(current_page):
             counter = 1
             while counter <= 10:
                 time.sleep(0.5)
-                parse_results()
+                url_list.extend(parse_results())
                 current_page += 1
+                print "Going to page %d" % current_page
                 next_page(current_page)
             recursive_parse(current_page)
         elif last_link.isdigit():
             last_page = int(last_link)
             while current_page <= last_page:
                 time.sleep(0.5)
-                parse_results()
+                url_list.extend(parse_results())
                 current_page += 1
                 print "Going to page %d" % current_page
                 next_page(current_page)
         elif "select" in last_link:
-            parse_results()
+            url_list.extend(parse_results())
+    unique_url_list = list(OrderedDict.fromkeys(url_list))
+    return unique_url_list
 
 def parse_results():
-    """Takes one whole search page and scrapes information from each doctor
-    on the page"""
+    """Returns a list containing all the urls that lead to a
+    doctor's page in a search result page."""
+    link_list = []
     soup = BeautifulSoup(BROWSER.page_source, "html.parser")
     for link in soup.find_all("a"):
         href = link.get("href")
         if href and "results" in href:
             url = PREFIX_URL + href
-            scrape_info(url)
+            link_list.append(url)
+    return link_list
+
+
 
 def scrape_info(url, query=""):
     """Scrapes the doctors information from the given URL. Query is given only
@@ -111,9 +119,9 @@ def scrape_info(url, query=""):
         status = doctor_page.find(id=SPAN_ID + "ListView3_ctrl%d_Label5"
                                   % tmp_doc.amount).text
         tmp_doc.amount += 1
-    else: # License Number Search
-        span = doctor_page.find(text=query)
-        amount = span[72:73]
+    else: # License Number Search - COMPLETED
+        span = doctor_page.find(text=query).parent
+        amount = str(span)[72:73]
         lic_num = query
         exp_date = doctor_page.find(id=SPAN_ID + "ListView3_ctrl%s_Label3"
                                     % amount).text
@@ -130,10 +138,13 @@ def next_page(page_num):
                 "$innercontent$gvLookup','Page$%d')" % page_num
     BROWSER.execute_script(js_string)
 
-
 if __name__ == "__main__":
+    search_method = ""
+    query = ""
     s_method_number = raw_input("Search by (1) Last Name "
-                                "or (2) License Number?")
+                                "or (2) License Number? ")
+    s_method_number = int(s_method_number)
+
     if s_method_number == 1:
         search_method = "LName"
         query = raw_input("Last name substring you wish to search by: ")
@@ -142,5 +153,10 @@ if __name__ == "__main__":
         query = raw_input("License number you wish to search by: ")
     BROWSER.get("http://www.armedicalboard.org/public/verify/lookup.aspx?" +
                     search_method + "=" + query)
-    recursive_parse(1)
+    if s_method_number == 2:
+        time.sleep(0.5)
+        scrape_info(BROWSER.current_url, query)
+    link_list = recursive_parse(1)
+    for link in link_list:
+        print link
     BROWSER.close()
