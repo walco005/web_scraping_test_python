@@ -135,28 +135,28 @@ def scrape_info(url, query=""):
     """
     doctor_list = []
     page = requests.get(url).text
-    doctor_pg = BeautifulSoup(page, "html.parser")
-    doctor_page = doctor_pg.find("div", {"class":"page-content"})
+    doctor_page = BeautifulSoup(page, "html.parser")
+    doctor_info = doctor_page.find("div", {"class":"page-content"})
 
 
-    if doctor_page.find(title="Error on page"):
+    if doctor_info.find(title="Error on page"):
         print "Doctor could not be returned because of error on webpage: ", url
         return doctor_list
 
-    name = doctor_page.find(id=SPAN_ID + "ListView1_ctrl0_Label1").text
-    if not doctor_page.find(text="No data was returned"):
-        city = doctor_page.find(id=SPAN_ID + "ListView2_ctrl0_Label3").text
-        state = doctor_page.find(id=SPAN_ID + "ListView2_ctrl0_Label4").text
-        zip_code = doctor_page.find(id=SPAN_ID + "ListView2_ctrl0_Label5").text
+    name = doctor_info.find(id=SPAN_ID + "ListView1_ctrl0_Label1").text
+    if not doctor_info.find(text="No data was returned"):
+        city = doctor_info.find(id=SPAN_ID + "ListView2_ctrl0_Label3").text
+        state = doctor_info.find(id=SPAN_ID + "ListView2_ctrl0_Label4").text
+        zip_code = doctor_info.find(id=SPAN_ID + "ListView2_ctrl0_Label5").text
 
     if query:
         # License Number Search
-        span = doctor_page.find(text=query).parent
+        span = doctor_info.find(text=query).parent
         amount = str(span)[72:73]
         lic_num = query
-        exp_date = doctor_page.find(id=SPAN_ID + "ListView3_ctrl%s_Label3"
+        exp_date = doctor_info.find(id=SPAN_ID + "ListView3_ctrl%s_Label3"
                                     % amount).text
-        status = doctor_page.find(id=SPAN_ID + "ListView3_ctrl%s_Label5"
+        status = doctor_info.find(id=SPAN_ID + "ListView3_ctrl%s_Label5"
                                   % amount).text
         tmp_doc = {"name": name, "city": city, "state": state,
                    "zip": zip_code, "license num": lic_num,
@@ -165,12 +165,12 @@ def scrape_info(url, query=""):
     else:
         # Last Name Search
         i = 0
-        while doctor_page.find(id=SPAN_ID + "ListView3_ctrl%d_Label1" % i):
-            lic_num = doctor_page.find(id=SPAN_ID +
+        while doctor_info.find(id=SPAN_ID + "ListView3_ctrl%d_Label1" % i):
+            lic_num = doctor_info.find(id=SPAN_ID +
                                        "ListView3_ctrl%d_Label1" % i).text
-            exp_date = doctor_page.find(id=SPAN_ID +
+            exp_date = doctor_info.find(id=SPAN_ID +
                                         "ListView3_ctrl%d_Label3" % i).text
-            status = doctor_page.find(id=SPAN_ID +
+            status = doctor_info.find(id=SPAN_ID +
                                       "ListView3_ctrl%d_Label5" % i).text
             tmp_doc = {"name": name, "city": city, "state": state,
                        "zip": zip_code, "license num": lic_num,
