@@ -39,7 +39,6 @@ def last_name_search(query):
     for link in unique_url_list:
         if i % 10 == 0:
             print "%d of %d doctors scraped..." % (i, len(unique_url_list))
-        time.sleep(0.2)
         doctor_list.extend(scrape_info(link))
         i += 1
     print "%d licenses from %d doctors scraped." % (len(doctor_list), i)
@@ -67,6 +66,8 @@ def get_links(current_page, url_list=[]):
 
     Args:
         current_page: The page that get_links is starting from.
+        url_list: Used when recursively going through the function, it is
+        a list of all the previously obtained urls.
 
     Returns:
         url_list: a list containing all the urls found so far, then at the end
@@ -78,19 +79,19 @@ def get_links(current_page, url_list=[]):
         if last_link == "...":
             counter = 1
             while counter <= 10:
-                time.sleep(0.2)
                 url_list.extend(get_urls_from_page())
                 current_page += 1
                 next_page(current_page)
                 counter += 1
+                time.sleep(0.2)
             get_links(current_page, url_list)
         elif last_link.isdigit():
             last_page = int(last_link)
             while current_page <= last_page:
-                time.sleep(0.2)
                 url_list.extend(get_urls_from_page())
                 current_page += 1
                 next_page(current_page)
+                time.sleep(0.2)
         elif last_link == "select":
             url_list.extend(get_urls_from_page())
     return url_list
@@ -105,9 +106,9 @@ def get_urls_from_page():
     """
     link_list = []
     soup = BeautifulSoup(BROWSER.page_source, "html.parser")
-    for link in soup.find_all("a"):
+    for link in soup.find_all("a", href=True):
         href = link.get("href")
-        if href and "results" in href:
+        if "results" in href:
             url = PREFIX_URL + href
             link_list.append(url)
     return link_list
@@ -181,14 +182,28 @@ def scrape_info(url, query=""):
 
 
 def next_page(page_num):
-    """Continues to the given page in the search result table."""
+    """Continues to the given page in the search result table.
+
+    next_page executes javascript that's on the webpage to update the page
+    with the next page of results in the table.
+    !!!This does not work if the page number is not listed in the contents,
+    i.e. you cannot go to page 20 while only 1-10 shows under the table.
+
+    Args:
+        page_num: The page number that you wish to go to.
+    """
     js_string = "javascript:__doPostBack('ctl00$ctl00$MainContentPlaceHolder" \
                 "$innercontent$gvLookup','Page$%d')" % page_num
     BROWSER.execute_script(js_string)
 
 def print_csv(doctor_list):
     """Prints a list of dictionaries containing doctors information to a
-    CSV file."""
+    CSV file.
+
+    Args:
+        doctor_list: The list of doctor dictionaries to be printed out
+        into the csv file.
+    """
     with open(FILE_NAME, "wb") as csvfile:
         fieldnames = ["name", "city", "state", "zip", "license num",
                       "expiration date", "status"]
