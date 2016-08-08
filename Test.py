@@ -1,11 +1,11 @@
 """This program scrapes information from the Arkansas Medical Board website
 for a given search query and returns the doctors information as a CSV file."""
 
-import urllib2
 import time
 import csv
 from collections import OrderedDict
 from selenium import webdriver
+import requests
 from bs4 import BeautifulSoup
 
 FILE_NAME = "results.csv"
@@ -29,9 +29,8 @@ def last_name_search(query):
         If a doctor has multiple licenses listed it will return each license
         in a different dict.
     """
-    search_method = "LName"
-    BROWSER.get("http://www.armedicalboard.org/public/verify/lookup.aspx?" +
-                search_method + "=" + query)
+    BROWSER.get("http://www.armedicalboard.org/public/verify/lookup.aspx?"
+                "LName=" + query)
     link_list = get_links(1)
     unique_url_list = list(OrderedDict.fromkeys(link_list))
     print "%d unique doctors found." % len(unique_url_list)
@@ -40,7 +39,7 @@ def last_name_search(query):
     for link in unique_url_list:
         if i % 10 == 0:
             print "%d of %d doctors scraped..." % (i, len(unique_url_list))
-        time.sleep(0.5)
+        time.sleep(0.2)
         doctor_list.extend(scrape_info(link))
         i += 1
     print "%d licenses from %d doctors scraped." % (len(doctor_list), i)
@@ -54,10 +53,8 @@ def lic_num_search(query):
     Args:
         query: The license number the user wishes to search by.
     """
-    search_method = "LicNum"
-    BROWSER.get("http://www.armedicalboard.org/public/verify/lookup.aspx?" +
-                search_method + "=" + query)
-    time.sleep(0.5)
+    BROWSER.get("http://www.armedicalboard.org/public/verify/lookup.aspx?"
+                "LicNum=" + query)
     doctor = scrape_info(BROWSER.current_url, query)
     print doctor
 
@@ -78,23 +75,23 @@ def get_links(current_page, url_list=[]):
     results_page = BeautifulSoup(BROWSER.page_source, "html.parser")
     last_link = results_page.find("table").find_all("a", href=True)[-1].text
     if current_page % 10 == 1:
-        if "..." == last_link:
+        if last_link == "...":
             counter = 1
             while counter <= 10:
-                time.sleep(0.5)
+                time.sleep(0.2)
                 url_list.extend(get_urls_from_page())
                 current_page += 1
                 next_page(current_page)
                 counter += 1
-            get_links(current_page)
+            get_links(current_page, url_list)
         elif last_link.isdigit():
             last_page = int(last_link)
             while current_page <= last_page:
-                time.sleep(0.5)
+                time.sleep(0.2)
                 url_list.extend(get_urls_from_page())
                 current_page += 1
                 next_page(current_page)
-        elif "select" == last_link:
+        elif last_link == "select":
             url_list.extend(get_urls_from_page())
     return url_list
 
@@ -136,16 +133,17 @@ def scrape_info(url, query=""):
         tmp_doc: A dict containing the license specified in query.
         (Used in license number search)
     """
-    doc_list = []
-    page = urllib2.urlopen(url)
-    doctor_page = BeautifulSoup(page.read(), "html.parser")
+    doctor_list = []
+    page = requests.get(url).text
+    doctor_pg = BeautifulSoup(page, "html.parser")
+    doctor_page = doctor_pg.find("div", {"class":"page-content"})
+
 
     if doctor_page.find(title="Error on page"):
         print "Doctor could not be returned because of error on webpage: ", url
-        return doc_list
+        return doctor_list
 
     name = doctor_page.find(id=SPAN_ID + "ListView1_ctrl0_Label1").text
-    print name
     if not doctor_page.find(text="No data was returned"):
         city = doctor_page.find(id=SPAN_ID + "ListView2_ctrl0_Label3").text
         state = doctor_page.find(id=SPAN_ID + "ListView2_ctrl0_Label4").text
@@ -157,9 +155,9 @@ def scrape_info(url, query=""):
         amount = str(span)[72:73]
         lic_num = query
         exp_date = doctor_page.find(id=SPAN_ID + "ListView3_ctrl%s_Label3"
-                                                 % amount).text
+                                    % amount).text
         status = doctor_page.find(id=SPAN_ID + "ListView3_ctrl%s_Label5"
-                                               % amount).text
+                                  % amount).text
         tmp_doc = {"name": name, "city": city, "state": state,
                    "zip": zip_code, "license num": lic_num,
                    "expiration date": exp_date, "status": status}
@@ -177,9 +175,9 @@ def scrape_info(url, query=""):
             tmp_doc = {"name": name, "city": city, "state": state,
                        "zip": zip_code, "license num": lic_num,
                        "expiration date": exp_date, "status": status}
-            doc_list.append(tmp_doc)
+            doctor_list.append(tmp_doc)
             i += 1
-        return doc_list
+        return doctor_list
 
 
 def next_page(page_num):
@@ -204,11 +202,11 @@ if __name__ == "__main__":
     method_number = int(raw_input("Search by (1) Last Name "
                                   "or (2) License Number? "))
     if method_number == 1:
-        query = raw_input("Last name substring you wish to search by: ")
-        doc_list = last_name_search(query)
+        name_query = raw_input("Last name substring you wish to search by: ")
+        doc_list = last_name_search(name_query)
         print_csv(doc_list)
         print "%d results printed to %s" % (len(doc_list), FILE_NAME)
     elif method_number == 2:
-        query = raw_input("License number you wish to search by: ")
-        lic_num_search(query)
+        lic_query = raw_input("License number you wish to search by: ")
+        lic_num_search(lic_query)
     BROWSER.close()
