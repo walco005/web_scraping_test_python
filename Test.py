@@ -74,7 +74,8 @@ def get_links(current_page, url_list=[]):
         returns the entire list of urls received.
     """
     results_page = BeautifulSoup(BROWSER.page_source, "html.parser")
-    last_link = results_page.find("table").find_all("a", href=True)[-1].text
+    links = results_page.find("table").find_all("a", href=True)
+    last_link = links[-1].text
     if current_page % 10 == 1:
         if last_link == "...":
             counter = 1
@@ -87,6 +88,12 @@ def get_links(current_page, url_list=[]):
             get_links(current_page, url_list)
         elif last_link.isdigit():
             last_page = int(last_link)
+            if(len(links) < 20):
+                for link in links:
+                    href = link.get("href")
+                    if "results" in href:
+                        url = PREFIX_URL + href
+                        url_list.append(url)
             while current_page <= last_page:
                 url_list.extend(get_urls_from_page())
                 current_page += 1
@@ -137,27 +144,25 @@ def scrape_info(url, query=""):
     doctor_list = []
     page = requests.get(url).text
     doctor_page = BeautifulSoup(page, "html.parser")
-    doctor_info = doctor_page.find("div", {"class":"page-content"})
 
-
-    if doctor_info.find(title="Error on page"):
+    if "Error" in doctor_page.title.string:
         print "Doctor could not be returned because of error on webpage: ", url
         return doctor_list
 
-    name = doctor_info.find(id=SPAN_ID + "ListView1_ctrl0_Label1").text
-    if not doctor_info.find(text="No data was returned"):
-        city = doctor_info.find(id=SPAN_ID + "ListView2_ctrl0_Label3").text
-        state = doctor_info.find(id=SPAN_ID + "ListView2_ctrl0_Label4").text
-        zip_code = doctor_info.find(id=SPAN_ID + "ListView2_ctrl0_Label5").text
+    name = doctor_page.find(id=SPAN_ID + "ListView1_ctrl0_Label1").text
+    if not doctor_page.find(text="No data was returned"):
+        city = doctor_page.find(id=SPAN_ID + "ListView2_ctrl0_Label3").text
+        state = doctor_page.find(id=SPAN_ID + "ListView2_ctrl0_Label4").text
+        zip_code = doctor_page.find(id=SPAN_ID + "ListView2_ctrl0_Label5").text
 
     if query:
         # License Number Search
-        span = doctor_info.find(text=query).parent
+        span = doctor_page.find(text=query).parent
         amount = str(span)[72:73]
         lic_num = query
-        exp_date = doctor_info.find(id=SPAN_ID + "ListView3_ctrl%s_Label3"
+        exp_date = doctor_page.find(id=SPAN_ID + "ListView3_ctrl%s_Label3"
                                     % amount).text
-        status = doctor_info.find(id=SPAN_ID + "ListView3_ctrl%s_Label5"
+        status = doctor_page.find(id=SPAN_ID + "ListView3_ctrl%s_Label5"
                                   % amount).text
         tmp_doc = {"name": name, "city": city, "state": state,
                    "zip": zip_code, "license num": lic_num,
@@ -166,12 +171,12 @@ def scrape_info(url, query=""):
     else:
         # Last Name Search
         i = 0
-        while doctor_info.find(id=SPAN_ID + "ListView3_ctrl%d_Label1" % i):
-            lic_num = doctor_info.find(id=SPAN_ID +
+        while doctor_page.find(id=SPAN_ID + "ListView3_ctrl%d_Label1" % i):
+            lic_num = doctor_page.find(id=SPAN_ID +
                                        "ListView3_ctrl%d_Label1" % i).text
-            exp_date = doctor_info.find(id=SPAN_ID +
+            exp_date = doctor_page.find(id=SPAN_ID +
                                         "ListView3_ctrl%d_Label3" % i).text
-            status = doctor_info.find(id=SPAN_ID +
+            status = doctor_page.find(id=SPAN_ID +
                                       "ListView3_ctrl%d_Label5" % i).text
             tmp_doc = {"name": name, "city": city, "state": state,
                        "zip": zip_code, "license num": lic_num,
